@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<title>Лісова Пісня</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+body{font-family:Arial;background:#020617;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh}
+.card{width:420px;background:#020617;padding:24px;border-radius:18px;text-align:center}
+input,button{width:100%;padding:12px;margin-top:10px;border-radius:12px;border:none}
+input{background:#0f172a;color:#fff}
+button{background:#22c55e;font-weight:bold}
+.hidden{display:none}
+.badge{display:inline-block;padding:4px 10px;border-radius:10px;margin-bottom:6px}
+.vip{background:#facc15;color:#000}
+.admin{background:#ef4444}
+</style>
+</head>
+<body>
+
+<div class="card">
+<h2>🌲 Лісова Пісня</h2>
+
+<div id="loginBox">
+  <input id="email" placeholder="Email">
+  <input id="password" type="password" placeholder="Пароль">
+  <button onclick="login()">Увійти</button>
+  <button onclick="register()">Реєстрація</button>
+</div>
+
+<div id="userBox" class="hidden">
+  <div id="roleBadge"></div>
+  <p>Імʼя: <b><span id="uname"></span></b></p>
+  <p>ID: <b><span id="myIdd"></span></b></p>
+  <p>Баланс: <b><span id="balance"></span></b></p>
+  <button onclick="location.href='services.html'">🛎 Послуги</button>
+  <button onclick="location.href='qr.html'">💸 Переказ</button>
+  <button onclick="logout()">🚪 Вийти</button>
+</div>
+</div>
+
+<script>
+const sb=supabase.createClient(
+"https://mefzopeenhfdqfatbjaq.supabase.co",
+"sb_publishable_LU94dUJoW2jwZJ9WIdfsMw_lEnMQobx"
+);
+
+async function register(){
+ const {error}=await sb.auth.signUp({email:email.value,password:password.value});
+ if(!error) alert("OK");
+}
+
+async function login(){
+ const {error}=await sb.auth.signInWithPassword({email:email.value,password:password.value});
+ if(!error) load();
+}
+
+async function load(){
+ const {data:{user}}=await sb.auth.getUser();
+ if(!user) return;
+
+ let {data}=await sb.from("bank").select("*").eq("user_id",user.id).single();
+ if(!data){
+   await sb.from("bank").insert({user_id:user.id,balance:0,name:"User"});
+   data=(await sb.from("bank").select("*").eq("user_id",user.id).single()).data;
+ }
+
+ loginBox.classList.add("hidden");
+ userBox.classList.remove("hidden");
+ balance.innerText=data.balance;
+ myIdd.innerText=data.idd;
+ uname.innerText=data.name;
+
+ if(data.is_admin) roleBadge.innerHTML='<span class="badge admin">ADMIN</span>';
+ else if(data.is_vip_user) roleBadge.innerHTML='<span class="badge vip">VIP</span>';
+}
+
+async function logout(){
+ await sb.auth.signOut();
+ location.reload();
+}
+
+load();
+</script>
+</body>
+</html>

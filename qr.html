@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<title>QR Переказ</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
+<style>
+body{font-family:Arial;background:#020617;color:#fff;padding:20px}
+.box{max-width:420px;margin:auto;background:#020617;padding:20px;border-radius:16px}
+button,input{width:100%;padding:12px;margin-top:8px;border-radius:10px;border:none}
+button{background:#22c55e;font-weight:bold}
+input{background:#0f172a;color:#fff}
+video{width:100%;margin-top:10px}
+</style>
+</head>
+<body>
+<div class="box">
+<h2>💸 Переказ QR</h2>
+<input id="toId" placeholder="ID отримувача">
+<input id="amount" type="number" min="1" placeholder="Сума">
+<button onclick="makeQR()">🔳 Створити QR</button>
+<div id="qr"></div>
+<hr>
+<button onclick="scan()">📷 Сканувати QR</button>
+<video id="cam" hidden></video>
+<button onclick="location.href='services.html'">← Назад</button>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

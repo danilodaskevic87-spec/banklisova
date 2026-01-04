@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<title>Напої</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+body{font-family:Arial;background:#020617;color:#fff;padding:20px}
+.box{max-width:420px;margin:auto}
+button{width:100%;padding:12px;margin-top:10px;border-radius:10px;border:none;background:#22c55e}
+</style>
+</head>
+<body>
+<div class="box">
+<h2>🍬 Напої</h2>
+<p>Баланс: <span id="balance"></span></p>
+<button onclick="buy(5)">Цукерка -5</button>
+<button onclick="buy(3)">Вода -3</button>
+<button onclick="location.href='services.html'">← Назад</button>
+</div>
+
+<script>
+const sb=supabase.createClient(
+"https://mefzopeenhfdqfatbjaq.supabase.co",
+"sb_publishable_LU94dUJoW2jwZJ9WIdfsMw_lEnMQobx"
+);
+
+async function load(){
+ const {data:{user}}=await sb.auth.getUser();
+ const {data}=await sb.from("bank").select("balance").eq("user_id",user.id).single();
+ balance.innerText=data.balance;
+}
+
+async function buy(c){
+ const {data:{user}}=await sb.auth.getUser();
+ const {data}=await sb.from("bank").select("balance").eq("user_id",user.id).single();
+ if(data.balance<c){alert("❌");return;}
+ await sb.from("bank").update({balance:data.balance-c}).eq("user_id",user.id);
+ load();
+}
+
+load();
+</script>
+</body>
+</html>
