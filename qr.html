@@ -24,7 +24,7 @@ body{
   border-radius:16px;
   box-shadow:0 0 30px rgba(0,0,0,.6)
 }
-input,button{
+button,input{
   width:100%;
   padding:12px;
   margin-top:10px;
@@ -32,28 +32,31 @@ input,button{
   border:none;
   font-size:15px
 }
-input{background:#0f172a;color:#fff}
 button{background:#22c55e;color:#000;font-weight:bold}
-#qr{margin-top:15px;text-align:center}
+input{background:#0f172a;color:#fff}
+#qr{text-align:center;margin-top:10px}
+#receiver{margin-top:10px;font-weight:bold}
 video{width:100%;margin-top:10px;border-radius:12px}
 </style>
 </head>
 
 <body>
 <div class="box">
-  <h2>💸 Переказ через QR</h2>
+  <h2>🔁 Переказ</h2>
 
-  <input id="toIdd" placeholder="ID отримувача (idd)">
-  <input id="sum" type="number" placeholder="Сума">
-
-  <button onclick="makeQR()">Створити QR</button>
-  <button onclick="scan()">Сканувати QR</button>
-
+  <button onclick="myQR()">📱 Мій QR-код</button>
   <div id="qr"></div>
+
+  <hr>
+
+  <button onclick="scan()">📷 Сканувати</button>
   <video id="cam" hidden></video>
 
-  <br>
-  <a href="services.html" style="color:#38bdf8">← Назад</a>
+  <div id="receiver"></div>
+
+  <input id="sum" type="number" placeholder="Введіть суму">
+  <button onclick="pay()">Переказати</button>
+
 </div>
 
 <script src="app.js"></script>
