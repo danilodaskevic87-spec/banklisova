@@ -1,35 +1,10 @@
-// app.js
-
+// ================= SUPABASE =================
 const sb = supabase.createClient(
   "https://mefzopeenhfdqfatbjaq.supabase.co",
   "sb_publishable_LU94dUJoW2jwZJ9WIdfsMw_lEnMQobx"
 );
 
-// ===== AUTH =====
-async function register(){
-  const { error } = await sb.auth.signUp({
-    email: email.value,
-    password: password.value
-  });
-  if(error) alert(error.message);
-  else alert("OK");
-}
-
-async function login(){
-  const { error } = await sb.auth.signInWithPassword({
-    email: email.value,
-    password: password.value
-  });
-  if(error) alert("❌");
-  else location.href = "index.html";
-}
-
-async function logout(){
-  await sb.auth.signOut();
-  location.href = "index.html";
-}
-
-// ===== LOAD USER / BANK =====
+// ================= LOAD USER =================
 async function loadUser(){
   const { data:{user} } = await sb.auth.getUser();
   if(!user) return;
@@ -46,60 +21,56 @@ async function loadUser(){
       balance: 0,
       name: "User"
     });
-    data = (await sb.from("bank")
-      .select("*")
-      .eq("user_id", user.id)
-      .single()).data;
-  }
-
-  if(typeof balance !== "undefined") balance.innerText = data.balance;
-  if(typeof myIdd !== "undefined") myIdd.innerText = data.idd;
-  if(typeof uname !== "undefined") uname.innerText = data.name;
-
-  if(typeof roleBadge !== "undefined"){
-    roleBadge.innerHTML = "";
-    if(data.is_admin) roleBadge.innerHTML = '<span class="badge admin">ADMIN</span>';
-    else if(data.is_vip_user) roleBadge.innerHTML = '<span class="badge vip">VIP</span>';
   }
 }
+loadUser();
 
-// ===== BUY (FOOD) =====
-async function buy(cost){
+// ================= QR GENERATE =================
+async function makeQR(){
+  const toIddEl = document.getElementById("toIdd");
+  const sumEl   = document.getElementById("sum");
+  const qrBox   = document.getElementById("qr");
+
+  if(!toIddEl || !sumEl || !qrBox) return;
+
+  const toIdd = Number(toIddEl.value);
+  const sum   = Number(sumEl.value);
+
+  if(!toIdd || !sum || sum <= 0){
+    alert("❌ Введіть ID та суму");
+    return;
+  }
+
   const { data:{user} } = await sb.auth.getUser();
-  const { data } = await sb
+  if(!user){
+    alert("❌ Ви не увійшли");
+    return;
+  }
+
+  const { data:bank } = await sb
     .from("bank")
     .select("balance")
     .eq("user_id", user.id)
     .single();
 
-  if(data.balance < cost){
-    alert("❌");
+  if(!bank || bank.balance < sum){
+    alert("❌ Недостатньо коштів");
     return;
   }
 
-  await sb
-    .from("bank")
-    .update({ balance: data.balance - cost })
-    .eq("user_id", user.id);
-
-  loadUser();
-}
-
-// ===== QR GENERATE =====
-function makeQR(){
-  qr.innerHTML = "";
-  new QRCode(qr,{
-    text: JSON.stringify({
-      idd: Number(toIdd.value),
-      sum: Number(sum.value)
-    }),
-    width: 200,
-    height: 200
+  qrBox.innerHTML = "";
+  new QRCode(qrBox,{
+    text: JSON.stringify({ idd: toIdd, sum: sum }),
+    width: 220,
+    height: 220
   });
 }
 
-// ===== QR SCAN + TRANSFER =====
+// ================= QR SCAN + TRANSFER =================
 async function scan(){
+  const cam = document.getElementById("cam");
+  if(!cam) return;
+
   cam.hidden = false;
   const stream = await navigator.mediaDevices.getUserMedia({ video:true });
   cam.srcObject = stream;
@@ -119,39 +90,48 @@ async function scan(){
 
       if(code){
         stream.getTracks().forEach(t=>t.stop());
-        const data = JSON.parse(code.data);
 
+        const payload = JSON.parse(code.data);
         const { data:{user} } = await sb.auth.getUser();
+
         const { data:me } = await sb
           .from("bank")
           .select("balance")
           .eq("user_id", user.id)
           .single();
 
-        if(me.balance < data.sum){
-          alert("❌");
+        if(!me || me.balance < payload.sum){
+          alert("❌ Недостатньо коштів");
           return;
         }
 
         const { data:to } = await sb
           .from("bank")
           .select("name")
-          .eq("idd", data.idd)
+          .eq("idd", payload.idd)
           .single();
 
-        if(confirm(`Ви дійсно хочете переказати ${data.sum} лісничяків користувачу ${to.name}?`)){
-          await sb
-            .from("bank")
-            .update({ balance: me.balance - data.sum })
-            .eq("user_id", user.id);
-
-          await sb.rpc("add_balance_by_idd", {
-            p_idd: data.idd,
-            p_sum: data.sum
-          });
-
-          alert("✅");
+        if(!to){
+          alert("❌ Отримувача не знайдено");
+          return;
         }
+
+        const ok = confirm(
+          `Ви дійсно хочете переказати ${payload.sum} лісничяків користувачу ${to.name}?`
+        );
+        if(!ok) return;
+
+        await sb
+          .from("bank")
+          .update({ balance: me.balance - payload.sum })
+          .eq("user_id", user.id);
+
+        await sb.rpc("add_balance_by_idd", {
+          p_idd: payload.idd,
+          p_sum: payload.sum
+        });
+
+        alert("✅ Переказ виконано");
         return;
       }
     }
@@ -160,4 +140,3 @@ async function scan(){
   loop();
 }
 
-loadUser();
