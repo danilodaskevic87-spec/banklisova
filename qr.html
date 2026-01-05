@@ -1,73 +1,139 @@
-<!DOCTYPE html>
-<html lang="uk">
-<head>
-<meta charset="UTF-8">
-<title>QR Переказ</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+const sb = supabase.createClient(
+  "https://mefzopeenhfdqfatbjaq.supabase.co",
+  "sb_publishable_LU94dUJoW2jwZJ9WIdfsMw_lEnMQobx"
+);
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
+let scannedIdd = null;
 
-<style>
-body{
-  background:#020617;
-  color:#fff;
-  font-family:Arial;
-  padding:20px
+// ===== МІЙ QR (реальний idd) =====
+async function myQR(){
+  const qrBox = document.getElementById("qr");
+  qrBox.innerHTML = "";
+
+  const { data:{user} } = await sb.auth.getUser();
+  if(!user){
+    alert("❌ Ви не увійшли");
+    return;
+  }
+
+  const { data, error } = await sb
+    .from("bank")
+    .select("idd")
+    .eq("user_id", user.id)
+    .single();
+
+  if(error || !data){
+    alert("❌ Bank не знайдено");
+    return;
+  }
+
+  new QRCode(qrBox,{
+    text: JSON.stringify({ idd: data.idd }),
+    width:220,
+    height:220
+  });
 }
-.box{
-  max-width:420px;
-  margin:auto;
-  background:#020617;
-  padding:20px;
-  border-radius:16px;
-  box-shadow:0 0 30px rgba(0,0,0,.6)
+
+// ===== SCAN QR =====
+async function scan(){
+  const cam = document.getElementById("cam");
+  cam.hidden = false;
+
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  const cameras = devices.filter(d=>d.kind==="videoinput");
+  if(cameras.length===0){
+    alert("❌ Камеру не знайдено");
+    return;
+  }
+
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video:{ deviceId:{ exact:cameras[cameras.length-1].deviceId } }
+  });
+
+  cam.srcObject = stream;
+  cam.play();
+
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+
+  async function loop(){
+    if(cam.readyState === cam.HAVE_ENOUGH_DATA){
+      canvas.width = cam.videoWidth;
+      canvas.height = cam.videoHeight;
+      ctx.drawImage(cam,0,0);
+
+      const img = ctx.getImageData(0,0,canvas.width,canvas.height);
+      const code = jsQR(img.data, canvas.width, canvas.height);
+
+      if(code){
+        stream.getTracks().forEach(t=>t.stop());
+        cam.hidden = true;
+
+        const payload = JSON.parse(code.data);
+        scannedIdd = payload.idd;
+
+        const { data, error } = await sb
+          .from("bank")
+          .select("name")
+          .eq("idd", scannedIdd)
+          .single();
+
+        if(error || !data){
+          alert("❌ Отримувача не знайдено");
+          return;
+        }
+
+        const r = document.getElementById("receiver");
+        r.style.display="block";
+        r.innerText = "Отримувач: " + data.name;
+        return;
+      }
+    }
+    requestAnimationFrame(loop);
+  }
+  loop();
 }
-button,input{
-  width:100%;
-  padding:12px;
-  margin-top:10px;
-  border-radius:10px;
-  border:none;
-  font-size:15px
+
+// ===== PAY (REAL BALANCE TRANSFER) =====
+async function pay(){
+  if(!scannedIdd){
+    alert("❌ Спочатку відскануйте QR");
+    return;
+  }
+
+  const sum = Number(document.getElementById("sum").value);
+  if(!sum || sum<=0){
+    alert("❌ Введіть суму");
+    return;
+  }
+
+  const { data:{user} } = await sb.auth.getUser();
+
+  const { data:me } = await sb
+    .from("bank")
+    .select("balance")
+    .eq("user_id", user.id)
+    .single();
+
+  if(me.balance < sum){
+    alert("❌ Недостатньо коштів");
+    return;
+  }
+
+  if(!confirm(`Переказати ${sum} лісничяків?`)) return;
+
+  // списання
+  await sb
+    .from("bank")
+    .update({ balance: me.balance - sum })
+    .eq("user_id", user.id);
+
+  // зарахування
+  await sb.rpc("add_balance_by_idd", {
+    p_idd: scannedIdd,
+    p_sum: sum
+  });
+
+  alert("✅ Переказ виконано");
+  location.reload();
 }
-button{background:#22c55e;color:#000;font-weight:bold}
-input{background:#0f172a;color:#fff}
-#qr{text-align:center;margin-top:10px}
-#receiver{
-  margin-top:10px;
-  padding:10px;
-  background:#0f172a;
-  border-radius:10px;
-  display:none
-}
-video{
-  width:100%;
-  margin-top:10px;
-  border-radius:12px
-}
-</style>
-</head>
-
-<body>
-<div class="box">
-  <h2>🔁 Переказ</h2>
-
-  <button onclick="myQR()">📱 Мій QR</button>
-  <div id="qr"></div>
-
-  <hr>
-
-  <button onclick="scan()">📷 Сканувати QR</button>
-  <video id="cam" hidden></video>
-
-  <div id="receiver"></div>
-
-  <input id="sum" type="number" placeholder="Введіть суму">
-  <button onclick="pay()">Переказати</button>
-</div>
-
-<script src="app.js"></script>
-</body>
-</html>
