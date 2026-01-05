@@ -5,27 +5,38 @@ const sb = supabase.createClient(
 
 let scannedIdd = null;
 
-// ===== МІЙ QR (реальний idd) =====
+// ===== ЗАВАНТАЖЕННЯ КАМЕР =====
+async function loadCameras(){
+  const select = document.getElementById("cameraSelect");
+  if(!select) return;
+
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  select.innerHTML = "";
+
+  devices
+    .filter(d => d.kind === "videoinput")
+    .forEach((cam, i) => {
+      const opt = document.createElement("option");
+      opt.value = cam.deviceId;
+      opt.text = cam.label || "Камера " + (i+1);
+      select.appendChild(opt);
+    });
+}
+loadCameras();
+
+// ===== МІЙ QR =====
 async function myQR(){
   const qrBox = document.getElementById("qr");
   qrBox.innerHTML = "";
 
   const { data:{user} } = await sb.auth.getUser();
-  if(!user){
-    alert("❌ Ви не увійшли");
-    return;
-  }
+  if(!user){ alert("❌ Ви не увійшли"); return; }
 
-  const { data, error } = await sb
+  const { data } = await sb
     .from("bank")
     .select("idd")
     .eq("user_id", user.id)
     .single();
-
-  if(error || !data){
-    alert("❌ Bank не знайдено");
-    return;
-  }
 
   new QRCode(qrBox,{
     text: JSON.stringify({ idd: data.idd }),
@@ -37,17 +48,12 @@ async function myQR(){
 // ===== SCAN QR =====
 async function scan(){
   const cam = document.getElementById("cam");
+  const select = document.getElementById("cameraSelect");
+
   cam.hidden = false;
 
-  const devices = await navigator.mediaDevices.enumerateDevices();
-  const cameras = devices.filter(d=>d.kind==="videoinput");
-  if(cameras.length===0){
-    alert("❌ Камеру не знайдено");
-    return;
-  }
-
   const stream = await navigator.mediaDevices.getUserMedia({
-    video:{ deviceId:{ exact:cameras[cameras.length-1].deviceId } }
+    video:{ deviceId:{ exact: select.value } }
   });
 
   cam.srcObject = stream;
@@ -72,20 +78,7 @@ async function scan(){
         const payload = JSON.parse(code.data);
         scannedIdd = payload.idd;
 
-        const { data, error } = await sb
-          .from("bank")
-          .select("name")
-          .eq("idd", scannedIdd)
-          .single();
-
-        if(error || !data){
-          alert("❌ Отримувача не знайдено");
-          return;
-        }
-
-        const r = document.getElementById("receiver");
-        r.style.display="block";
-        r.innerText = "Отримувач: " + data.name;
+        showReceiver(scannedIdd);
         return;
       }
     }
@@ -94,15 +87,31 @@ async function scan(){
   loop();
 }
 
-// ===== PAY (REAL BALANCE TRANSFER) =====
+// ===== ПОКАЗ ОТРИМУВАЧА =====
+async function showReceiver(idd){
+  const { data } = await sb
+    .from("bank")
+    .select("name")
+    .eq("idd", idd)
+    .single();
+
+  const r = document.getElementById("receiver");
+  r.style.display="block";
+  r.innerText = "Отримувач: " + data.name;
+}
+
+// ===== PAY =====
 async function pay(){
-  if(!scannedIdd){
-    alert("❌ Спочатку відскануйте QR");
+  const manual = document.getElementById("manualIdd").value;
+  const idd = manual ? Number(manual) : scannedIdd;
+
+  if(!idd){
+    alert("❌ Немає ID отримувача");
     return;
   }
 
   const sum = Number(document.getElementById("sum").value);
-  if(!sum || sum<=0){
+  if(!sum || sum <= 0){
     alert("❌ Введіть суму");
     return;
   }
@@ -122,15 +131,13 @@ async function pay(){
 
   if(!confirm(`Переказати ${sum} лісничяків?`)) return;
 
-  // списання
   await sb
     .from("bank")
     .update({ balance: me.balance - sum })
     .eq("user_id", user.id);
 
-  // зарахування
   await sb.rpc("add_balance_by_idd", {
-    p_idd: scannedIdd,
+    p_idd: idd,
     p_sum: sum
   });
 
