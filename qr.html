@@ -24,7 +24,7 @@ body{
   border-radius:16px;
   box-shadow:0 0 30px rgba(0,0,0,.6)
 }
-button,input{
+button,input,select{
   width:100%;
   padding:12px;
   margin-top:10px;
@@ -33,7 +33,7 @@ button,input{
   font-size:15px
 }
 button{background:#22c55e;color:#000;font-weight:bold}
-input{background:#0f172a;color:#fff}
+input,select{background:#0f172a;color:#fff}
 #qr{text-align:center;margin-top:10px}
 #receiver{
   margin-top:10px;
@@ -54,17 +54,26 @@ video{
 <div class="box">
   <h2>🔁 Переказ</h2>
 
+  <!-- МІЙ QR -->
   <button onclick="myQR()">📱 Мій QR</button>
   <div id="qr"></div>
 
   <hr>
 
+  <!-- ВИБІР КАМЕРИ -->
+  <select id="cameraSelect"></select>
   <button onclick="scan()">📷 Сканувати QR</button>
   <video id="cam" hidden></video>
 
+  <!-- ОТРИМУВАЧ -->
   <div id="receiver"></div>
 
+  <!-- РУЧНИЙ ВВІД ID -->
+  <input id="manualIdd" placeholder="Ввести ID вручну">
+
+  <!-- СУМА -->
   <input id="sum" type="number" placeholder="Введіть суму">
+
   <button onclick="pay()">Переказати</button>
 </div>
 
