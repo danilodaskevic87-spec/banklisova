@@ -5,7 +5,7 @@ const sb = supabase.createClient(
 
 let scannedIdd = null;
 
-// ===== МІЙ QR =====
+// ===== МІЙ QR (реальний idd) =====
 async function myQR(){
   const qrBox = document.getElementById("qr");
   qrBox.innerHTML = "";
@@ -23,7 +23,7 @@ async function myQR(){
     .single();
 
   if(error || !data){
-    alert("❌ Не знайдено bank");
+    alert("❌ Bank не знайдено");
     return;
   }
 
@@ -34,28 +34,20 @@ async function myQR(){
   });
 }
 
-// ===== SCAN (ЗОВНІШНЯ КАМЕРА) =====
+// ===== SCAN QR =====
 async function scan(){
   const cam = document.getElementById("cam");
   cam.hidden = false;
 
-  // отримуємо всі камери
   const devices = await navigator.mediaDevices.enumerateDevices();
-  const cameras = devices.filter(d => d.kind === "videoinput");
-
-  if(cameras.length === 0){
+  const cameras = devices.filter(d=>d.kind==="videoinput");
+  if(cameras.length===0){
     alert("❌ Камеру не знайдено");
     return;
   }
 
-  // беремо НЕ фронтальну (зазвичай остання)
-  const cameraId =
-    cameras.length > 1
-      ? cameras[cameras.length - 1].deviceId
-      : cameras[0].deviceId;
-
   const stream = await navigator.mediaDevices.getUserMedia({
-    video: { deviceId: { exact: cameraId } }
+    video:{ deviceId:{ exact:cameras[cameras.length-1].deviceId } }
   });
 
   cam.srcObject = stream;
@@ -80,16 +72,20 @@ async function scan(){
         const payload = JSON.parse(code.data);
         scannedIdd = payload.idd;
 
-        const { data } = await sb
+        const { data, error } = await sb
           .from("bank")
           .select("name")
           .eq("idd", scannedIdd)
           .single();
 
-        const receiverBox = document.getElementById("receiver");
-        receiverBox.style.display = "block";
-        receiverBox.innerText = "Отримувач: " + data.name;
+        if(error || !data){
+          alert("❌ Отримувача не знайдено");
+          return;
+        }
 
+        const r = document.getElementById("receiver");
+        r.style.display="block";
+        r.innerText = "Отримувач: " + data.name;
         return;
       }
     }
@@ -98,7 +94,7 @@ async function scan(){
   loop();
 }
 
-// ===== PAY =====
+// ===== PAY (REAL BALANCE TRANSFER) =====
 async function pay(){
   if(!scannedIdd){
     alert("❌ Спочатку відскануйте QR");
@@ -106,12 +102,13 @@ async function pay(){
   }
 
   const sum = Number(document.getElementById("sum").value);
-  if(!sum || sum <= 0){
+  if(!sum || sum<=0){
     alert("❌ Введіть суму");
     return;
   }
 
   const { data:{user} } = await sb.auth.getUser();
+
   const { data:me } = await sb
     .from("bank")
     .select("balance")
@@ -123,14 +120,15 @@ async function pay(){
     return;
   }
 
-  if(!confirm(`Переказати ${sum} лісничяків користувачу ${scannedIdd}?`))
-    return;
+  if(!confirm(`Переказати ${sum} лісничяків?`)) return;
 
+  // списання
   await sb
     .from("bank")
     .update({ balance: me.balance - sum })
     .eq("user_id", user.id);
 
+  // зарахування
   await sb.rpc("add_balance_by_idd", {
     p_idd: scannedIdd,
     p_sum: sum
