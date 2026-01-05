@@ -7,17 +7,25 @@ let scannedIdd = null;
 
 // ===== МІЙ QR =====
 async function myQR(){
-  const { data:{user} } = await sb.auth.getUser();
-  if(!user){ alert("Не увійшли"); return; }
+  const qrBox = document.getElementById("qr");
+  qrBox.innerHTML = "";
 
-  const { data } = await sb
+  const { data:{user} } = await sb.auth.getUser();
+  if(!user){
+    alert("❌ Ви не увійшли");
+    return;
+  }
+
+  const { data, error } = await sb
     .from("bank")
     .select("idd")
     .eq("user_id", user.id)
     .single();
 
-  const qrBox = document.getElementById("qr");
-  qrBox.innerHTML = "";
+  if(error || !data){
+    alert("❌ Не знайдено bank");
+    return;
+  }
 
   new QRCode(qrBox,{
     text: JSON.stringify({ idd: data.idd }),
@@ -26,12 +34,30 @@ async function myQR(){
   });
 }
 
-// ===== SCAN =====
+// ===== SCAN (ЗОВНІШНЯ КАМЕРА) =====
 async function scan(){
   const cam = document.getElementById("cam");
   cam.hidden = false;
 
-  const stream = await navigator.mediaDevices.getUserMedia({ video:true });
+  // отримуємо всі камери
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  const cameras = devices.filter(d => d.kind === "videoinput");
+
+  if(cameras.length === 0){
+    alert("❌ Камеру не знайдено");
+    return;
+  }
+
+  // беремо НЕ фронтальну (зазвичай остання)
+  const cameraId =
+    cameras.length > 1
+      ? cameras[cameras.length - 1].deviceId
+      : cameras[0].deviceId;
+
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: { deviceId: { exact: cameraId } }
+  });
+
   cam.srcObject = stream;
   cam.play();
 
@@ -49,6 +75,8 @@ async function scan(){
 
       if(code){
         stream.getTracks().forEach(t=>t.stop());
+        cam.hidden = true;
+
         const payload = JSON.parse(code.data);
         scannedIdd = payload.idd;
 
@@ -58,8 +86,9 @@ async function scan(){
           .eq("idd", scannedIdd)
           .single();
 
-        document.getElementById("receiver").innerText =
-          "Отримувач: " + data.name;
+        const receiverBox = document.getElementById("receiver");
+        receiverBox.style.display = "block";
+        receiverBox.innerText = "Отримувач: " + data.name;
 
         return;
       }
@@ -72,7 +101,7 @@ async function scan(){
 // ===== PAY =====
 async function pay(){
   if(!scannedIdd){
-    alert("❌ Немає отримувача");
+    alert("❌ Спочатку відскануйте QR");
     return;
   }
 
@@ -94,7 +123,8 @@ async function pay(){
     return;
   }
 
-  if(!confirm(`Переказати ${sum} лісничяків?`)) return;
+  if(!confirm(`Переказати ${sum} лісничяків користувачу ${scannedIdd}?`))
+    return;
 
   await sb
     .from("bank")
