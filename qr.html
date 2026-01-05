@@ -35,8 +35,18 @@ button,input{
 button{background:#22c55e;color:#000;font-weight:bold}
 input{background:#0f172a;color:#fff}
 #qr{text-align:center;margin-top:10px}
-#receiver{margin-top:10px;font-weight:bold}
-video{width:100%;margin-top:10px;border-radius:12px}
+#receiver{
+  margin-top:10px;
+  padding:10px;
+  background:#0f172a;
+  border-radius:10px;
+  display:none;
+}
+video{
+  width:100%;
+  margin-top:10px;
+  border-radius:12px
+}
 </style>
 </head>
 
@@ -49,14 +59,13 @@ video{width:100%;margin-top:10px;border-radius:12px}
 
   <hr>
 
-  <button onclick="scan()">📷 Сканувати</button>
+  <button onclick="scan()">📷 Сканувати (зовнішня камера)</button>
   <video id="cam" hidden></video>
 
   <div id="receiver"></div>
 
   <input id="sum" type="number" placeholder="Введіть суму">
   <button onclick="pay()">Переказати</button>
-
 </div>
 
 <script src="app.js"></script>
